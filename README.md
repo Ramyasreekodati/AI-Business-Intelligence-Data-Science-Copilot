@@ -48,6 +48,3 @@ docker compose up -d
 ```
 
 The rest of the documentation lives in the `docs/` folder and provides the full product blueprint, architecture decisions, and implementation guide.
-=
-
-
