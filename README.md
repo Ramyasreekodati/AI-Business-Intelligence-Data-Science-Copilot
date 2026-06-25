@@ -1,3 +1,4 @@
+
 # AI Business Intelligence & Data Science Copilot
 
 This repository is the **flagship engineering portfolio** that demonstrates a production‑grade AI‑driven Business Intelligence platform.
@@ -47,3 +48,6 @@ docker compose up -d
 ```
 
 The rest of the documentation lives in the `docs/` folder and provides the full product blueprint, architecture decisions, and implementation guide.
+=
+
+
