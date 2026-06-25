@@ -4,7 +4,6 @@ version = "0.1.0"
 description = "AI Business Intelligence Data Science Copilot"
 authors = ["Ramyasreekodati <example@example.com>"]
 license = "MIT"
-python = "^3.14"
 
 [tool.poetry.dependencies]
 python = "^3.14"
