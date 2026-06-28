@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from .api import router as api_router
-from ...src.engine.auth_middleware import auth_middleware
+from src.engine.auth_middleware import auth_middleware
 
 app = FastAPI(
     title="AI Business Intelligence & Data Science Copilot",

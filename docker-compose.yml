@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    container_name: backend
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    depends_on: []
+
+  streamlit:
+    build: ./streamlit_app
+    container_name: streamlit_demo
+    ports:
+      - "8501:8501"
+    environment:
+      - STREAMLIT_TOKEN=${STREAMLIT_TOKEN:-demo}
+    depends_on:
+      - backend
+    # Ensure the streamlit service can reach the backend via service name
+    network_mode: "bridge"
+
+networks:
+  default:
+    driver: bridge
