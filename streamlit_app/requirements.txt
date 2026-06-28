@@ -2,3 +2,5 @@ streamlit
 requests
 pydantic
 matplotlib
+plotly
+pandas
