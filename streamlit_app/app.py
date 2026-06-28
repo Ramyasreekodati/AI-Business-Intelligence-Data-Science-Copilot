@@ -215,14 +215,59 @@ elif page == "🤖 AI Copilot Chat":
         
     # Generate bot response if the last message is from the user
     if st.session_state["chat_history"][-1]["role"] == "user":
-        prompt = st.session_state["chat_history"][-1]["content"]
-        with st.spinner("Copilot is analyzing..."):
-            time.sleep(1.5) # Simulate LLM delay
+        prompt = st.session_state["chat_history"][-1]["content"].lower()
+        with st.spinner("Copilot is analyzing your data..."):
+            time.sleep(1.0) # Simulate analysis time
+            
             if st.session_state["df"] is not None:
                 df = st.session_state["df"]
-                response = f"Based on the dataset uploaded, I can see it contains **{len(df):,} rows** and **{len(df.columns)} columns**. I am currently running in a demo environment, but in production, I would execute SQL or Pandas logic here to answer: *'{prompt}'*."
+                response = ""
+                
+                # Rule-based Data Analysis Engine
+                if "missing" in prompt or "null" in prompt:
+                    missing = df.isnull().sum()
+                    missing = missing[missing > 0]
+                    if len(missing) == 0:
+                        response = "Great news! There are **no missing values** in your dataset."
+                    else:
+                        response = "Here are the columns with missing values:\n" + missing.to_frame(name="Count").to_markdown()
+                
+                elif "numerical" in prompt or "numeric" in prompt or "stats" in prompt or "describe" in prompt:
+                    num_cols = df.select_dtypes(include=['number'])
+                    if len(num_cols.columns) == 0:
+                        response = "There are no numerical columns in your dataset."
+                    else:
+                        desc = num_cols.describe().round(2).T[['count', 'mean', 'min', 'max']]
+                        response = "Here is the statistical summary of your numerical data:\n\n" + desc.to_markdown()
+                
+                elif "categorical" in prompt or "text" in prompt or "categories" in prompt:
+                    cat_cols = df.select_dtypes(include=['object', 'category'])
+                    if len(cat_cols.columns) == 0:
+                        response = "There are no categorical columns in your dataset."
+                    else:
+                        summary = pd.DataFrame({
+                            'Unique Values': cat_cols.nunique(),
+                            'Most Common': [cat_cols[c].mode()[0] if not cat_cols[c].empty else 'N/A' for c in cat_cols.columns]
+                        })
+                        response = "Here is a summary of your categorical data:\n\n" + summary.to_markdown()
+                
+                elif "shape" in prompt or "size" in prompt or "rows" in prompt or "columns" in prompt:
+                    response = f"Your dataset has **{len(df):,} rows** and **{len(df.columns)} columns**."
+                
+                elif "columns" in prompt or "features" in prompt or "list" in prompt:
+                    cols = ", ".join([f"`{c}`" for c in df.columns])
+                    response = f"Your dataset contains the following columns:\n{cols}"
+                    
+                elif "insight" in prompt or "summary" in prompt or "overview" in prompt:
+                    num_cols = df.select_dtypes(include=['number']).shape[1]
+                    cat_cols = df.select_dtypes(include=['object', 'category']).shape[1]
+                    total_missing = df.isnull().sum().sum()
+                    response = f"**Dataset Overview:**\n- Total Rows: {len(df):,}\n- Total Features: {len(df.columns)}\n- Numerical Features: {num_cols}\n- Categorical Features: {cat_cols}\n- Total Missing Cells: {total_missing}\n\n*Try asking me specific questions like 'are there missing values?' or 'show numerical stats'.*"
+                
+                else:
+                    response = f"I'm a lightweight Data Copilot running without an LLM API key. I can answer specific questions like:\n- *'Are there any missing values?'*\n- *'Give me numerical stats'*\n- *'Show categorical data'*\n- *'What are the insights?'*\n\n(I detected your query: '{prompt}')"
             else:
-                response = f"Please upload a dataset first so I can analyze it to answer: *'{prompt}'*."
+                response = "Please upload a dataset first so I can analyze it."
             
             st.session_state["chat_history"].append({"role": "assistant", "content": response})
             st.rerun()
