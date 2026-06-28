@@ -1,75 +1,65 @@
 import streamlit as st
-import requests
 import os
+import uuid
+import sys
+
+# Add the parent directory to sys.path so we can import from agents and src
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # ---------- Configuration ----------
-BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
-API_PREFIX = "/api/v1"
-TOKEN = os.getenv("STREAMLIT_TOKEN", "")
-
-# Helper functions
-def post_endpoint(endpoint: str, json_body=None, files=None):
-    headers = {"Authorization": f"Bearer {TOKEN}"} if TOKEN else {}
-    url = f"{BACKEND_URL}{API_PREFIX}{endpoint}"
-    try:
-        if files:
-            resp = requests.post(url, files=files, headers=headers)
-        else:
-            resp = requests.post(url, json=json_body, headers=headers)
-        resp.raise_for_status()
-        return resp.json()
-    except requests.exceptions.RequestException as exc:
-        st.error(f"Request to {endpoint} failed: {exc}")
-        return None
-
-def get_endpoint(endpoint: str):
-    headers = {"Authorization": f"Bearer {TOKEN}"} if TOKEN else {}
-    url = f"{BACKEND_URL}{API_PREFIX}{endpoint}"
-    try:
-        resp = requests.get(url, headers=headers)
-        resp.raise_for_status()
-        return resp.json()
-    except requests.exceptions.RequestException as exc:
-        st.error(f"GET {endpoint} failed: {exc}")
-        return None
+DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data"))
+os.makedirs(DATA_DIR, exist_ok=True)
 
 # ---------- UI ----------
 st.set_page_config(page_title="AI BI Demo", layout="centered")
 st.title("AI Business Intelligence & Data Science Copilot Demo")
-st.write("Upload a CSV/Excel file, run analysis, and view the generated report.")
+st.write("Upload a CSV file to run the AI analysis locally within Streamlit (No Backend Required).")
 
-uploaded_file = st.file_uploader("Choose a CSV or Excel file", type=["csv", "xlsx"])
+uploaded_file = st.file_uploader("Choose a CSV file", type=["csv"])
+
 if uploaded_file is not None:
     st.success(f"File `{uploaded_file.name}` ready.")
-    if st.button("Send to backend"):
-        with st.spinner("Uploading…"):
-            files = {"file": (uploaded_file.name, uploaded_file.read(), uploaded_file.type)}
-            resp = post_endpoint("/upload", files=files)
-        if resp:
-            file_id = resp.get("file_id") or resp.get("id")
-            st.session_state["file_id"] = file_id
-            st.success(f"Uploaded – file_id: `{file_id}`")
-
-if "file_id" in st.session_state:
-    if st.button("Run Analysis"):
-        with st.spinner("Analyzing…"):
-            resp = post_endpoint("/analyze", json_body={"file_id": st.session_state["file_id"]})
-        if resp:
-            run_id = resp.get("run_id")
-            st.session_state["run_id"] = run_id
-            st.success(f"Analysis started – run_id: `{run_id}`")
-
-if "run_id" in st.session_state:
-    if st.button("Fetch Report"):
-        with st.spinner("Fetching report…"):
-            report = get_endpoint(f"/report/{st.session_state['run_id']}")
-        if report:
-            st.subheader("Report")
-            insights = report.get("insights")
-            charts = report.get("charts")
-            if insights:
-                st.write(insights)
-            if charts:
-                for i, url in enumerate(charts):
-                    st.image(url, caption=f"Chart {i+1}")
-            st.success("Report displayed.")
+    
+    if st.button("Run AI Analysis"):
+        with st.spinner("Processing file..."):
+            # 1. Save file locally
+            dataset_id = str(uuid.uuid4())
+            dest_path = os.path.join(DATA_DIR, f"{dataset_id}.csv")
+            with open(dest_path, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+            st.session_state["dataset_id"] = dataset_id
+            st.success(f"File uploaded successfully! Dataset ID: `{dataset_id}`")
+            
+        with st.spinner("Agents are analyzing the dataset... This may take a moment."):
+            try:
+                # 2. Import agents directly from the codebase
+                from agents.supervisor_agent import SupervisorAgent
+                from agents.data_agent import DataAgent
+                from agents.eda_agent import EDAGent
+                from agents.business_agent import BusinessAgent
+                
+                # 3. Setup agents and execute
+                agents_registry = {
+                    "cleaning": DataAgent(),
+                    "eda": EDAGent(),
+                    "insight": BusinessAgent(),
+                    "report": BusinessAgent(),
+                }
+                supervisor = SupervisorAgent(agents_registry)
+                
+                # 4. Run the analysis
+                result = supervisor.execute(dataset_id, context={})
+                
+                # 5. Display Results
+                st.subheader("Analysis Report")
+                
+                # Depending on what `result` is (dict or string), display it gracefully
+                if isinstance(result, dict):
+                    st.json(result)
+                else:
+                    st.write(result)
+                    
+                st.success("Analysis complete!")
+                
+            except Exception as e:
+                st.error(f"An error occurred during analysis: {e}")
