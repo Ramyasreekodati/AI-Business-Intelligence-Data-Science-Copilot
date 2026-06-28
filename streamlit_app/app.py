@@ -1,5 +1,5 @@
 import streamlit as st
-import httpx
+import requests
 import os
 
 # ---------- Configuration ----------
@@ -8,32 +8,30 @@ API_PREFIX = "/api/v1"
 TOKEN = os.getenv("STREAMLIT_TOKEN", "")
 
 # Helper functions
-async def post_endpoint(endpoint: str, json_body=None, files=None):
-    async with httpx.AsyncClient() as client:
-        headers = {"Authorization": f"Bearer {TOKEN}"} if TOKEN else {}
-        url = f"{BACKEND_URL}{API_PREFIX}{endpoint}"
-        try:
-            if files:
-                resp = await client.post(url, files=files, headers=headers)
-            else:
-                resp = await client.post(url, json=json_body, headers=headers)
-            resp.raise_for_status()
-            return resp.json()
-        except httpx.HTTPError as exc:
-            st.error(f"Request to {endpoint} failed: {exc}")
-            return None
+def post_endpoint(endpoint: str, json_body=None, files=None):
+    headers = {"Authorization": f"Bearer {TOKEN}"} if TOKEN else {}
+    url = f"{BACKEND_URL}{API_PREFIX}{endpoint}"
+    try:
+        if files:
+            resp = requests.post(url, files=files, headers=headers)
+        else:
+            resp = requests.post(url, json=json_body, headers=headers)
+        resp.raise_for_status()
+        return resp.json()
+    except requests.exceptions.RequestException as exc:
+        st.error(f"Request to {endpoint} failed: {exc}")
+        return None
 
-async def get_endpoint(endpoint: str):
-    async with httpx.AsyncClient() as client:
-        headers = {"Authorization": f"Bearer {TOKEN}"} if TOKEN else {}
-        url = f"{BACKEND_URL}{API_PREFIX}{endpoint}"
-        try:
-            resp = await client.get(url, headers=headers)
-            resp.raise_for_status()
-            return resp.json()
-        except httpx.HTTPError as exc:
-            st.error(f"GET {endpoint} failed: {exc}")
-            return None
+def get_endpoint(endpoint: str):
+    headers = {"Authorization": f"Bearer {TOKEN}"} if TOKEN else {}
+    url = f"{BACKEND_URL}{API_PREFIX}{endpoint}"
+    try:
+        resp = requests.get(url, headers=headers)
+        resp.raise_for_status()
+        return resp.json()
+    except requests.exceptions.RequestException as exc:
+        st.error(f"GET {endpoint} failed: {exc}")
+        return None
 
 # ---------- UI ----------
 st.set_page_config(page_title="AI BI Demo", layout="centered")
@@ -46,7 +44,7 @@ if uploaded_file is not None:
     if st.button("Send to backend"):
         with st.spinner("Uploading…"):
             files = {"file": (uploaded_file.name, uploaded_file.read(), uploaded_file.type)}
-            resp = await post_endpoint("/upload", files=files)
+            resp = post_endpoint("/upload", files=files)
         if resp:
             file_id = resp.get("file_id") or resp.get("id")
             st.session_state["file_id"] = file_id
@@ -55,7 +53,7 @@ if uploaded_file is not None:
 if "file_id" in st.session_state:
     if st.button("Run Analysis"):
         with st.spinner("Analyzing…"):
-            resp = await post_endpoint("/analyze", json_body={"file_id": st.session_state["file_id"]})
+            resp = post_endpoint("/analyze", json_body={"file_id": st.session_state["file_id"]})
         if resp:
             run_id = resp.get("run_id")
             st.session_state["run_id"] = run_id
@@ -64,7 +62,7 @@ if "file_id" in st.session_state:
 if "run_id" in st.session_state:
     if st.button("Fetch Report"):
         with st.spinner("Fetching report…"):
-            report = await get_endpoint(f"/report/{st.session_state['run_id']}")
+            report = get_endpoint(f"/report/{st.session_state['run_id']}")
         if report:
             st.subheader("Report")
             insights = report.get("insights")
